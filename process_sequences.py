@@ -424,7 +424,7 @@ def process_file(
         (tmp_folder / f"{fasta_file.stem}_DNA_aln.fasta").unlink()
         outgroup_id = get_unique_id(aln_sequences_df, "Outgroup")
         if (
-            len(sequences_df[sequences_df["Unique_Id"] == outgroup_id])
+            len(aln_sequences_df[aln_sequences_df["Unique_Id"] == outgroup_id])
             == 1
         ):
             write_fasta(
@@ -754,7 +754,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     ref_seq_file = Path(args.consensus)
     nthreads = int(args.nthreads) if args.nthreads is not None else 1
-    """
     outgroup_hits = (
         pd.read_csv(args.outgroup_hits)
         if args.outgroup_hits is not None
@@ -798,7 +797,6 @@ if __name__ == "__main__":
         for fasta_file in get_path("msa").iterdir()
         if fasta_file.suffix == ".fasta"
     )
-    """
     trained_models = select_models()
     Parallel(n_jobs=nthreads)(
         delayed(initialize_test)(protein_models)
