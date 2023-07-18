@@ -702,13 +702,14 @@ def initialize_test(
                 pivot_codons_df(root_df),
             )
             for model_type in gene.scores.keys():
-                test = Test(
-                    gene,
-                    model_type,
-                    gene.compute_mutation_scores(mut_df, model_type),
-                )
-                test.compute_test()
-                test.write(get_path("test"))
+                if model_type=="DCA":
+                    test = Test(
+                        gene,
+                        model_type,
+                        gene.compute_mutation_scores(mut_df, model_type),
+                    )
+                    test.compute_test()
+                    test.write(get_path("test"))
 
 
 def select_models() -> Dict[str, List[Path]]:

@@ -15,7 +15,7 @@ TODO
 """
 
 from pathlib import Path
-from typing import List, Optional, Dict, Union
+from typing import List, Optional, Dict
 import subprocess
 
 from Bio.SeqRecord import SeqRecord  # type: ignore
@@ -32,7 +32,7 @@ from src.config import (  # type: ignore # pylint: disable=import-error
     hhblits,
     uniclust,
 )
-from src.bio_basics import read_fasta, write_fasta  # type: ignore # pylint: disable=import-error
+from src.bio_basics import read_fasta, write_fasta
 from src.dca import Dca  # type: ignore # pylint: disable=import-error
 from src.msa import Msa  # type: ignore # pylint: disable=import-error
 
@@ -154,9 +154,7 @@ class SequenceModel:
             return "".join(
                 [i for i in self.ref_sequence if i.upper() == i]
             ).replace("-", "")
-        raise TypeError(
-            "ref_sequence attribute should be a string not None"
-        )
+        raise TypeError("ref_sequence attribute should be a string not None")
 
     def is_similar(self, sequence: str) -> bool:
         """Check identity between sequence and self.ref_sequence.
@@ -253,9 +251,7 @@ class SequenceModel:
             not isinstance(self.msa.array, np.ndarray)
             or self.msa.array.shape[1] != length
             or not np.all(
-                ~np.apply_along_axis(
-                    self.is_similar, -1, self.msa.array
-                )
+                ~np.apply_along_axis(self.is_similar, -1, self.msa.array)
             )
         ):
             return False
@@ -264,8 +260,7 @@ class SequenceModel:
     def write(self, output_folder: Path):
         """Write SequenceModel instance to a .npz file.
 
-        Check that SequenceModel instance matches
-        requirements. If so, writes it to a .npz
+        Writes SequenceModel to a .npz
         file using the model name as file name.
 
         Parameters
@@ -278,11 +273,7 @@ class SequenceModel:
         NoneType
             None
         """
-        if (
-            self.is_complete()
-            and self.model is not None
-            and self.msa is not None
-        ):
+        if self.model is not None and self.msa is not None:
             np.savez(
                 output_folder / f"{self.name}.npz",
                 reference_sequence=self.ref_sequence,
@@ -291,22 +282,43 @@ class SequenceModel:
                 msa_array=self.msa.array,
                 msa_type=self.msa.origin,
             )
+        elif self.model is not None and self.msa is None:
+            np.savez(
+                output_folder / f"{self.name}.npz",
+                reference_sequence=self.ref_sequence,
+                h=self.model.h_matrix,
+                j=self.model.j_matrix,
+                msa_array=None,
+                msa_type=None,
+            )
+        elif self.model is None and self.msa is not None:
+            np.savez(
+                output_folder / f"{self.name}.npz",
+                reference_sequence=self.ref_sequence,
+                h=None,
+                j=None,
+                msa_array=self.msa.array,
+                msa_type=self.msa.origin,
+            )
         else:
-            with open(
-                output_folder / f"{self.name}.txt", "w"
-            ) as output_file:
-                if self.msa is not None and self.msa.array is not None:
-                    output_file.write(f"{self.msa.array.shape}")
-                else:
-                    output_file.write("No MSA")
+            np.savez(
+                output_folder / f"{self.name}.npz",
+                reference_sequence=self.ref_sequence,
+                h=None,
+                j=None,
+                msa_array=None,
+                msa_type=None,
+            )
 
-    def run_hhblits(self, path: Path) -> None:
-        """Run HHblits to find distant homologs MSA.
+    def run_hhblits(self, path: Path):
+        """Retrieve MSA of distant homologs using hhblits.
 
         Parameters
         ----------
-        path : Path
-            Path to temporary folder
+        path : pathlib.Path
+            Path to the folder where
+            temporary files will be
+            written
 
         Returns
         -------
@@ -320,9 +332,7 @@ class SequenceModel:
         path_hhr = path / f"{self.name}.hhr"
         path_aln = path / f"{self.name}.a3m"
         with open(path_refseq, "w") as refseq_file:
-            refseq_file.write(
-                f">Reference_sequence\n{self.ref_sequence}"
-            )
+            refseq_file.write(f">Reference_sequence\n{self.ref_sequence}")
         subprocess.run(
             [
                 hhblits,
@@ -339,9 +349,7 @@ class SequenceModel:
         )
         sequences = [
             SeqRecord(
-                Seq(
-                    "".join([i for i in str(seq.seq) if i.upper() == i])
-                ),
+                Seq("".join([i for i in str(seq.seq) if i.upper() == i])),
                 id=seq.id,
                 description="",
             )
@@ -380,40 +388,26 @@ class SequenceModel:
         success = True
         if not pfam_hmm_downloaded(pfam_id, path):
             success = download_pfam_hmm(pfam_id, path)
-        if (
-            success
-            and self.msa is not None
-            and self.msa.array is not None
-        ):
+        if success and self.msa is not None and self.msa.array is not None:
             # Write reference sequence to
             # fasta file to run hmmalign
             path_refseq = path / f"{self.name}.fasta"
             path_aln = path / f"{self.name}.sth"
             with open(path_refseq, "w") as refseq_file:
-                refseq_file.write(
-                    f">Reference_sequence\n{self.ref_sequence}"
-                )
+                refseq_file.write(f">Reference_sequence\n{self.ref_sequence}")
             try:
                 # Run hmmalign
                 with open(path_aln, "w") as output_file:
                     subprocess.run(
-                        [
-                            hmmalign,
-                            path / f"hmm_{pfam_id}",
-                            path_refseq,
-                        ],
+                        [hmmalign, path / f"hmm_{pfam_id}", path_refseq],
                         stdout=output_file,
                         stderr=subprocess.STDOUT,
                         check=True,
                     )
                 # Read hmmalign output
-                aln_aa_seq = str(
-                    AlignIO.read(path_aln, "stockholm")[0].seq
-                )
+                aln_aa_seq = str(AlignIO.read(path_aln, "stockholm")[0].seq)
                 # Remove gaps
-                not_gapped = [
-                    i != "-" for i in aln_aa_seq if i.upper() == i
-                ]
+                not_gapped = [i != "-" for i in aln_aa_seq if i.upper() == i]
                 # Checks that length of aligned
                 # reference sequence match msa
                 if len(not_gapped) == self.msa.array.shape[1]:
@@ -449,9 +443,7 @@ class SequenceModel:
         # Compare MSA sequences to
         # reference
         if self.ref_sequence is None:
-            raise ValueError(
-                "ref_sequence attribute should not be None"
-            )
+            raise ValueError("ref_sequence attribute should not be None")
         aln_ref_sequence = "".join(
             [
                 amino_acid
@@ -477,29 +469,19 @@ class SequenceModel:
             ]
             # Compute proportion of gaps
             # for each MSA column
-            not_gapped_col = self.msa.array.shape[0] - (
-                self.msa.array == "-"
-            ).sum(
+            gapped_col = (self.msa.array == "-").sum(
                 axis=0
-            )  # / self.msa.array.shape[0]
+            ) / self.msa.array.shape[0]
             # Remove from MSA and reference
             # sequence columns that
             # have >= prop_gap gaps
-            # self.msa.array = self.msa.array[:, gapped_col < self.msa.prop_gap]
-            self.msa.array = self.msa.array[
-                :,
-                not_gapped_col
-                >= (1 - self.msa.prop_gap) * self.msa.N_MSA,
-            ]
+            self.msa.array = self.msa.array[:, gapped_col < self.msa.prop_gap]
             new_ref_sequence = ""
             i = 0
             for amino_acid in self.ref_sequence:
                 if amino_acid.lower() == amino_acid:
                     new_ref_sequence += amino_acid
-                elif (
-                    not_gapped_col[i]
-                    >= (1 - self.msa.prop_gap) * self.msa.N_MSA
-                ):
+                elif gapped_col[i] < self.msa.prop_gap:
                     new_ref_sequence += amino_acid
                     i += 1
                 else:
@@ -591,16 +573,13 @@ class SequenceModel:
         if self.msa is not None and self.msa.array is not None:
             self.msa.to_fasta(path_msa)
             try:
-                subprocess.run(
-                    [julia, plmdca, path_msa, path_dca], check=True
-                )
+                subprocess.run([julia, plmdca, path_msa, path_dca], check=True)
                 dca_model = np.load(path_dca)
                 self.model = Dca(
                     h_matrix=dca_model["h"], j_matrix=dca_model["J"]
                 )
                 path_dca.unlink()
             except:  # pylint: disable=bare-except
-                print("Error")
                 self.model = Dca()
             if path_msa.is_file():
                 path_msa.unlink()
@@ -649,7 +628,7 @@ class SequenceModel:
             return self._scores["IND"]
         return None
 
-    def get_coverage(self) -> Union[np.ndarray, None]:
+    def get_coverage(self) -> np.ndarray:
         """
         Compute the coverage of the reference sequence by the model.
 
@@ -666,22 +645,19 @@ class SequenceModel:
         numpy.ndarray
             Coverage array
         """
-        if isinstance(self.ref_sequence, str) and isinstance(
-            self.msa, Msa
-        ):
+        if isinstance(self.ref_sequence, str) and isinstance(self.msa, Msa):
             # Computes reference sequence coverage
             coverage = np.array(
                 [int(i.upper() == i) for i in self.ref_sequence]
             )
             # Computes proportion of gaps per MSA column
-            # and compares it to the prop_gap_MSA threshold
+            # and compares it to the prop_gap threshold
             is_valid_amino_acid = np.vectorize(
                 lambda x: int(x in self.valid_AAs and x != "-")
             )
             gap_quality = (
-                is_valid_amino_acid(self.msa.array).mean(axis=0)
-                * self.msa.array.shape[0]
-                >= (1 - self.msa.prop_gap) * self.msa.N_MSA
+                1 - is_valid_amino_acid(self.msa.array).mean(axis=0)
+                <= self.msa.prop_gap
             ).astype(int) + 1
             # Updates coverage to remove too gapped indices
             j = 0
@@ -777,8 +753,7 @@ def download_pfam_hmm(pfam_id: str, path: Path) -> bool:
     path_pfam_hmm = f"http://pfam.xfam.org/family/{pfam_id}/hmm"
     try:
         subprocess.run(
-            ["curl", "-o", path / f"hmm_{pfam_id}", path_pfam_hmm],
-            check=True,
+            ["curl", "-o", path / f"hmm_{pfam_id}", path_pfam_hmm], check=True
         )
         if (path / f"hmm_{pfam_id}").is_file():
             return True
@@ -830,14 +805,13 @@ def read(path: Path) -> SequenceModel:
         SequenceModel instance
     """
     file_content = np.load(path)
+    origin = None
+    if file_content["msa_type"] is not None:
+        origin = str(file_content["msa_type"])
     return SequenceModel(
         name=path.stem,
         ref_sequence=str(file_content["reference_sequence"]),
-        model=Dca(
-            h_matrix=file_content["h"], j_matrix=file_content["j"]
-        ),
-        msa=Msa(
-            array=file_content["msa_array"],
-            origin=str(file_content["msa_type"]),
-        ),
+        model=Dca(h_matrix=file_content["h"], j_matrix=file_content["j"]),
+        msa=Msa(array=file_content["msa_array"], origin=origin,),
     )
+
